@@ -1,6 +1,8 @@
 module StockMonitor
 
 using DataFrames
+using Dates
+using Logging
 
 include("Screener.jl")
 include("Fetcher.jl")
