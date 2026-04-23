@@ -1,0 +1,15 @@
+# Daily StockMonitor.jl scan via crontab (WSL-side scheduling).
+# Install:  crontab crontab.example
+# Verify:   crontab -l
+#
+# CRON_TZ pins the schedule to US market time, tracks DST automatically.
+# Requires vixie cron (Ubuntu default under WSL2+systemd).
+#
+# Gotcha: cron only fires while the WSL VM is running. For unconditional
+# reliability use Windows Task Scheduler + run_scan.bat instead.
+
+CRON_TZ=America/New_York
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+# minute hour dom month dow
+15 16 * * 1-5 cd /home/jeepee/repos/StockMonitor.jl && /home/jeepee/.juliaup/bin/julia --project scripts/scan.jl >> logs/cron.log 2>&1
