@@ -1,0 +1,21 @@
+name = "StockMonitor"
+uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+version = "0.1.0"
+authors = ["Jeepee Liu <lzp0514@gmail.com>"]
+
+[deps]
+ArgParse = "c7e460c6-2fb9-53a9-8c5b-16f535851c63"
+CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+Parquet2 = "98572fba-bba0-415d-956f-fa77e587d26d"
+
+[compat]
+ArgParse = "1.2.0"
+CSV = "0.10.16"
+DataFrames = "1.8.2"
+HTTP = "1.11.0"
+JSON3 = "1.14.3"
+Parquet2 = "0.2.33"
+julia = "1.9"

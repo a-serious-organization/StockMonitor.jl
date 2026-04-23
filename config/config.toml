@@ -1,0 +1,26 @@
+[criteria]
+min_pct_change = 5.0       # percent, e.g. 5.0 = +5%
+min_price = 2.00           # US dollars
+min_volume = 100_000       # shares
+min_notional_volume = 1_000_000  # dollars (close * volume)
+direction = "gainers"      # gainers | losers | both
+
+[universe]
+source = "russell_3000"
+cache_path = "data/universe/russell_3000.csv"
+cache_max_age_days = 30
+
+[data]
+max_workers = 4
+retry_count = 2
+request_timeout = 30       # seconds
+
+[storage]
+results_dir = "data/results"
+history_dir = "data/history"
+latest_csv = "data/results/latest.csv"
+site_dir = "data/site"
+
+[logging]
+level = "Info"
+log_dir = "logs"
