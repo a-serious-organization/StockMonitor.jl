@@ -5,6 +5,8 @@ using Dates
 using Logging
 using HTTP
 using JSON3
+using CSV
+using Parquet2
 
 include("Screener.jl")
 include("Fetcher.jl")
