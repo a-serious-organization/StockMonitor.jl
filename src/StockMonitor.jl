@@ -3,6 +3,8 @@ module StockMonitor
 using DataFrames
 using Dates
 using Logging
+using HTTP
+using JSON3
 
 include("Screener.jl")
 include("Fetcher.jl")
