@@ -7,14 +7,17 @@ using HTTP
 using JSON3
 using CSV
 using Parquet2
+using ArgParse
+using LoggingExtras
 
 include("Screener.jl")
 include("Fetcher.jl")
 include("Universe.jl")
 include("Storage.jl")
 include("Site.jl")
+include("CLI.jl")
 
 export screen, compute_daily_metrics, fetch_daily_bars,
-       load_universe, write_results, load_history, render_site
+       load_universe, write_results, load_history, render_site, main
 
 end
