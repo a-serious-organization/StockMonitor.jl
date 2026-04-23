@@ -19,7 +19,7 @@ julia --version       # 1.12+
 ### 2. Install package dependencies
 
 ```bash
-git clone https://github.com/Jeepee-Liu/StockMonitor.jl
+git clone https://github.com/a-serious-organization/StockMonitor.jl
 cd StockMonitor.jl
 julia --project -e 'import Pkg; Pkg.instantiate()'
 ```

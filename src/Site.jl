@@ -55,7 +55,7 @@ const _PAGE_TEMPLATE = """<!DOCTYPE html>
 <footer>
   Generated {{scan_date}}. &middot;
   <a href="../results/latest.csv">latest.csv</a> &middot;
-  <a href="https://github.com/Jeepee-Liu/StockMonitor.jl">repo</a>
+  <a href="https://github.com/a-serious-organization/StockMonitor.jl">repo</a>
 </footer>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
