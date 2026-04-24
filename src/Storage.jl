@@ -1,13 +1,12 @@
 """
-CSV + Parquet output writers and history loader.
+Parquet output writers and history loader.
 
 Layout:
-    results_dir/gainers_YYYY-MM-DD.csv
-    results_dir/latest.csv
+    results_dir/gainers_YYYY-MM-DD.parquet
+    results_dir/latest.parquet
     history_dir/date=YYYY-MM-DD/results.parquet
 """
 
-using CSV
 using Parquet2
 
 function write_results(
@@ -15,18 +14,18 @@ function write_results(
         scan_date::Date,
         results_dir::AbstractString,
         history_dir::AbstractString,
-        latest_csv::AbstractString,
+        latest_parquet::AbstractString,
     )::Nothing
 
     mkpath(results_dir)
-    mkpath(dirname(latest_csv))
+    mkpath(dirname(latest_parquet))
 
-    dated = joinpath(results_dir, "gainers_$(Dates.format(scan_date, "yyyy-mm-dd")).csv")
-    CSV.write(dated, df)
+    dated = joinpath(results_dir, "gainers_$(Dates.format(scan_date, "yyyy-mm-dd")).parquet")
+    Parquet2.writefile(dated, df)
     @info "wrote $dated ($(nrow(df)) rows)"
 
-    CSV.write(latest_csv, df)
-    @info "wrote $latest_csv"
+    Parquet2.writefile(latest_parquet, df)
+    @info "wrote $latest_parquet"
 
     part_dir = joinpath(history_dir, "date=$(Dates.format(scan_date, "yyyy-mm-dd"))")
     mkpath(part_dir)

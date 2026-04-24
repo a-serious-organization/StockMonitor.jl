@@ -52,8 +52,8 @@ Exit codes: `0` success, `1` fatal error.
 
 Every scan writes:
 
-- `data/results/gainers_YYYY-MM-DD.csv` — dated snapshot
-- `data/results/latest.csv` — overwritten each run
+- `data/results/gainers_YYYY-MM-DD.parquet` — dated snapshot
+- `data/results/latest.parquet` — overwritten each run
 - `data/history/date=YYYY-MM-DD/results.parquet` — partitioned history
 - `data/site/index.html` — HTML dashboard (see below)
 
