@@ -6,12 +6,17 @@ fetch_daily_bars(tickers, cfg)  — HTTP I/O via Yahoo Finance v8 chart API.
 """
 
 const _METRIC_COLS = [:ticker, :date, :close, :prev_close,
-                      :pct_change, :volume, :notional_volume]
+                      :pct_change, :volume, :notional_volume,
+                      :pct_change_2d, :pct_change_5d, :pct_change_1m]
+
+_pct_gain(to::Float64, from::Float64) =
+    (isnan(from) || from == 0.0) ? NaN : (to - from) / from * 100.0
 
 function compute_daily_metrics(bars::DataFrame)::DataFrame
     empty_out = DataFrame(
         ticker=String[], date=Date[], close=Float64[], prev_close=Float64[],
         pct_change=Float64[], volume=Int[], notional_volume=Float64[],
+        pct_change_2d=Float64[], pct_change_5d=Float64[], pct_change_1m=Float64[],
     )
     isempty(bars) && return empty_out
 
@@ -19,7 +24,8 @@ function compute_daily_metrics(bars::DataFrame)::DataFrame
     result_rows = []
 
     for gdf in groupby(sorted, :ticker)
-        nrow(gdf) < 2 && continue
+        n = nrow(gdf)
+        n < 2 && continue
         prev_row = gdf[end-1, :]
         last_row = gdf[end,   :]
 
@@ -28,8 +34,12 @@ function compute_daily_metrics(bars::DataFrame)::DataFrame
 
         (isnan(close) || isnan(prev_close) || prev_close == 0) && continue
 
-        pct_change     = (close - prev_close) / prev_close * 100
+        pct_change      = _pct_gain(close, prev_close)
         notional_volume = close * last_row.volume
+
+        pct_change_2d = _pct_gain(close, n >= 3  ? gdf[end-2,  :close] : NaN)
+        pct_change_5d = _pct_gain(close, n >= 6  ? gdf[end-5,  :close] : NaN)
+        pct_change_1m = _pct_gain(close, n >= 22 ? gdf[end-21, :close] : NaN)
 
         push!(result_rows, (
             ticker          = last_row.ticker,
@@ -39,6 +49,9 @@ function compute_daily_metrics(bars::DataFrame)::DataFrame
             pct_change      = pct_change,
             volume          = last_row.volume,
             notional_volume = notional_volume,
+            pct_change_2d   = pct_change_2d,
+            pct_change_5d   = pct_change_5d,
+            pct_change_1m   = pct_change_1m,
         ))
     end
 
@@ -50,7 +63,7 @@ end
 function fetch_daily_bars(
         tickers::AbstractVector{<:AbstractString},
         cfg::Dict;
-        period_days::Int = 7,
+        period_days::Int = 40,
     )::DataFrame
 
     max_workers = get(cfg, "max_workers", 4)

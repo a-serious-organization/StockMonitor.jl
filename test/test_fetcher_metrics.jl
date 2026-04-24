@@ -91,8 +91,49 @@ end
         out = compute_daily_metrics(bars)
         @test nrow(out) == 0
         for col in [:ticker, :date, :close, :prev_close,
-                    :pct_change, :volume, :notional_volume]
+                    :pct_change, :volume, :notional_volume,
+                    :pct_change_2d, :pct_change_5d, :pct_change_1m]
             @test col in Symbol.(names(out))
         end
+    end
+
+    @testset "pct_change_2d computed from 3 sessions" begin
+        d3 = Date(2026, 4, 23)
+        bars = make_bars([("AAA", d1, 90.0, 1_000_000),
+                          ("AAA", d2, 100.0, 1_500_000),
+                          ("AAA", d3, 110.0, 2_000_000)])
+        out = compute_daily_metrics(bars)
+        @test nrow(out) == 1
+        @test out[1, :pct_change_2d] ≈ (110.0 - 90.0) / 90.0 * 100
+    end
+
+    @testset "pct_change_5d computed from 6 sessions" begin
+        dates_6 = [Date(2026, 4, 1) + Day(i) for i in 0:5]
+        rows_6  = [("AAA", dates_6[i], Float64(70 + i*10), 1_000_000) for i in 1:6]
+        bars    = make_bars(rows_6)
+        out     = compute_daily_metrics(bars)
+        @test nrow(out) == 1
+        # close_5ago = 80.0, close_today = 130.0
+        @test out[1, :pct_change_5d] ≈ (130.0 - 80.0) / 80.0 * 100
+    end
+
+    @testset "pct_change_1m computed from 22 sessions" begin
+        dates_22 = [Date(2026, 3, 1) + Day(i) for i in 0:21]
+        closes_22 = vcat(fill(100.0, 21), [120.0])
+        rows_22   = [("AAA", dates_22[i], closes_22[i], 1_000_000) for i in 1:22]
+        bars      = make_bars(rows_22)
+        out       = compute_daily_metrics(bars)
+        @test nrow(out) == 1
+        @test out[1, :pct_change_1m] ≈ (120.0 - 100.0) / 100.0 * 100
+    end
+
+    @testset "multi-period gains are NaN when insufficient history" begin
+        bars = make_bars([("AAA", d1, 100.0, 1_000_000),
+                          ("AAA", d2, 110.0, 2_000_000)])
+        out = compute_daily_metrics(bars)
+        @test nrow(out) == 1
+        @test isnan(out[1, :pct_change_2d])
+        @test isnan(out[1, :pct_change_5d])
+        @test isnan(out[1, :pct_change_1m])
     end
 end

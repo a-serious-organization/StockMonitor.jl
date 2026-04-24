@@ -120,10 +120,11 @@ function _format_results_block(df::DataFrame)::String
 
     io = IOBuffer()
     println(io, """<table class="gainers"><thead><tr>""")
-    for col in ["rank","ticker","close","prev_close","pct_change","volume","notional_volume"]
+    for col in ["rank","ticker","close","prev_close","pct_change","2d%","5d%","1m%","volume","notional_volume"]
         print(io, "<th>$col</th>")
     end
     println(io, "</tr></thead><tbody>")
+    fmt_pct(v) = isnan(v) ? "—" : "$(round(v, digits=2))%"
     for row in eachrow(df)
         println(io, "<tr>",
             "<td>$(row.rank)</td>",
@@ -131,6 +132,9 @@ function _format_results_block(df::DataFrame)::String
             "<td>$(round(row.close, digits=2))</td>",
             "<td>$(round(row.prev_close, digits=2))</td>",
             "<td>$(round(row.pct_change, digits=2))%</td>",
+            "<td>$(fmt_pct(row.pct_change_2d))</td>",
+            "<td>$(fmt_pct(row.pct_change_5d))</td>",
+            "<td>$(fmt_pct(row.pct_change_1m))</td>",
             "<td>$(format_int(row.volume))</td>",
             "<td>\$$(format_int(round(Int, row.notional_volume)))</td>",
             "</tr>")
