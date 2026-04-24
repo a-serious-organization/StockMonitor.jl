@@ -85,7 +85,7 @@ function run_scan(config::Dict;
     scfg = config["storage"]
     history_dir = scfg["history_dir"]
     write_results(results, scan_date,
-                  scfg["results_dir"], history_dir, scfg["latest_csv"])
+                  scfg["results_dir"], history_dir, scfg["latest_parquet"])
 
     render_site(results, load_history(history_dir),
                 config, scan_date, get(scfg, "site_dir", "data/site"))

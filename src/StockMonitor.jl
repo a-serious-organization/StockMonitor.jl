@@ -9,6 +9,7 @@ using CSV
 using Parquet2
 using ArgParse
 using LoggingExtras
+# CSV is kept for Universe.jl (iShares IWV holdings cache is a CSV source)
 
 include("Screener.jl")
 include("Fetcher.jl")

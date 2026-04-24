@@ -18,7 +18,7 @@ request_timeout = 30       # seconds
 [storage]
 results_dir = "data/results"
 history_dir = "data/history"
-latest_csv = "data/results/latest.csv"
+latest_parquet = "data/results/latest.parquet"
 site_dir = "data/site"
 
 [logging]

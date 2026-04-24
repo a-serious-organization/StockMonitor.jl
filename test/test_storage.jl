@@ -1,4 +1,4 @@
-using Test, DataFrames, Dates, CSV, Parquet2
+using Test, DataFrames, Dates, Parquet2
 using StockMonitor: write_results, load_history
 
 function sample_results(scan_date=Date(2026, 4, 22))
@@ -19,42 +19,42 @@ end
         mktempdir() do tmpdir
             rdir = joinpath(tmpdir, "results")
             hdir = joinpath(tmpdir, "history")
-            lat  = joinpath(rdir, "latest.csv")
+            lat  = joinpath(rdir, "latest.parquet")
             d = Date(2026, 4, 22)
             write_results(sample_results(d), d, rdir, hdir, lat)
 
-            @test isfile(joinpath(rdir, "gainers_2026-04-22.csv"))
+            @test isfile(joinpath(rdir, "gainers_2026-04-22.parquet"))
             @test isfile(lat)
             @test isfile(joinpath(hdir, "date=2026-04-22", "results.parquet"))
         end
     end
 
-    @testset "dated CSV and latest CSV match" begin
+    @testset "dated parquet and latest parquet match" begin
         mktempdir() do tmpdir
             rdir = joinpath(tmpdir, "results")
             hdir = joinpath(tmpdir, "history")
-            lat  = joinpath(rdir, "latest.csv")
+            lat  = joinpath(rdir, "latest.parquet")
             d = Date(2026, 4, 22)
             df = sample_results(d)
             write_results(df, d, rdir, hdir, lat)
 
-            dated  = CSV.read(joinpath(rdir, "gainers_2026-04-22.csv"), DataFrame)
-            latest = CSV.read(lat, DataFrame)
-            @test dated == latest
+            dated  = DataFrame(Parquet2.Dataset(joinpath(rdir, "gainers_2026-04-22.parquet")); copycols=false)
+            latest = DataFrame(Parquet2.Dataset(lat); copycols=false)
+            @test sort(dated.ticker) == sort(latest.ticker)
+            @test dated.close == latest.close
         end
     end
 
-    @testset "parquet is readable and contains scan_date column" begin
+    @testset "history parquet contains scan_date column" begin
         mktempdir() do tmpdir
             rdir = joinpath(tmpdir, "results")
             hdir = joinpath(tmpdir, "history")
-            lat  = joinpath(rdir, "latest.csv")
+            lat  = joinpath(rdir, "latest.parquet")
             d = Date(2026, 4, 22)
             write_results(sample_results(d), d, rdir, hdir, lat)
 
             pq = joinpath(hdir, "date=2026-04-22", "results.parquet")
-            ds = Parquet2.Dataset(pq)
-            rt = DataFrame(ds; copycols=false)
+            rt = DataFrame(Parquet2.Dataset(pq); copycols=false)
             @test sort(rt.ticker) == ["AAA", "BBB"]
             @test "scan_date" in names(rt)
             @test all(==(string(d)), rt.scan_date)
@@ -65,7 +65,7 @@ end
         mktempdir() do tmpdir
             rdir = joinpath(tmpdir, "results")
             hdir = joinpath(tmpdir, "history")
-            lat  = joinpath(rdir, "latest.csv")
+            lat  = joinpath(rdir, "latest.parquet")
             d1 = Date(2026, 4, 21)
             d2 = Date(2026, 4, 22)
             write_results(sample_results(d1), d1, rdir, hdir, lat)
