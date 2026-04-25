@@ -51,5 +51,5 @@ function load_history(history_dir::AbstractString)::DataFrame
     isempty(parts) && return DataFrame()
 
     frames = [DataFrame(Parquet2.Dataset(p); copycols=false) for p in parts]
-    return vcat(frames...)
+    return vcat(frames...; cols=:union)
 end
