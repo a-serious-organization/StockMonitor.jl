@@ -3,7 +3,7 @@
 End-of-day (EOD) scanner for the Russell 3000 — daily gainers meeting
 liquidity thresholds. Pure Julia port of
 [daily-stock-monitor](https://github.com/Jeepee-Liu/daily-stock-monitor)
-(Python/pandas). Same outputs (CSV + partitioned Parquet + static HTML
+(Python/pandas). Same outputs (partitioned Parquet + static HTML
 dashboard), same scheduling approach, idiomatic Julia.
 
 ## Install
@@ -57,7 +57,7 @@ Every scan writes:
 - `data/history/date=YYYY-MM-DD/results.parquet` — partitioned history
 - `data/site/index.html` — HTML dashboard (see below)
 
-Columns: `rank, ticker, date, close, prev_close, pct_change, volume, notional_volume`.
+Columns: `rank, ticker, date, close, prev_close, pct_change, pct_change_2d, pct_change_5d, pct_change_1m, volume, notional_volume`.
 
 ## Dashboard
 
@@ -132,8 +132,8 @@ Prices: Yahoo Finance v8 chart API via HTTP.jl (no API key required).
 ## Known quirk
 
 iShares IWV now emits dotless share-class tickers (e.g. `BRKB` instead of
-`BRK.B`). yfinance expects `BRK-B`. That one ticker logs a 404 warning and
-is skipped. Impact: ~1 ticker out of ~2581.
+`BRK.B`). Yahoo Finance expects `BRK-B`. That one ticker logs a 404 warning
+and is skipped. Impact: ~1 ticker out of ~2581.
 
 ## Dependencies
 
@@ -142,7 +142,7 @@ All managed by Julia's built-in `Pkg` — no conda/pip needed.
 | Package | Purpose |
 |---|---|
 | DataFrames.jl | tabular data |
-| CSV.jl | read/write CSV |
+| CSV.jl | read universe source CSV (IWV holdings) |
 | HTTP.jl | Yahoo Finance API |
 | JSON3.jl | parse API responses |
 | Parquet2.jl | parquet files |
