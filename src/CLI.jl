@@ -199,7 +199,7 @@ function run_scan(config::Dict;
     write_results(results, window_end,
                   scfg["results_dir"], history_dir, scfg["latest_parquet"])
 
-    render_site(results, load_history(history_dir), history_dir,
+    render_site(results, load_history(history_dir),
                 config, window_end, get(scfg, "site_dir", "data/site"))
 
     return 0

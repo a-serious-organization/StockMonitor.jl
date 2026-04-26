@@ -1,70 +1,67 @@
 using Test, DataFrames, Dates
 using StockMonitor: _build_chart_json
 
-function _mk_partitions(tmpdir, dates)
-    for d in dates
-        mkpath(joinpath(tmpdir, "date=$(Dates.format(d, "yyyy-mm-dd"))"))
-    end
-end
-
 @testset "Site chart JSON" begin
 
-    @testset "days with zero gainers still get a bar (with count 0)" begin
-        mktempdir() do tmpdir
-            d1, d2, d3 = Date(2026, 4, 21), Date(2026, 4, 22), Date(2026, 4, 23)
-            _mk_partitions(tmpdir, [d1, d2, d3])
-            # history only has rows for d2 (d1 and d3 had zero gainers)
-            history = DataFrame(
-                ticker    = ["AAA", "BBB"],
-                scan_date = [string(d2), string(d2)],
-            )
-            json = _build_chart_json(history, tmpdir, 14)
-            @test occursin("\"2026-04-21\"", json)
-            @test occursin("\"2026-04-22\"", json)
-            @test occursin("\"2026-04-23\"", json)
-            @test occursin("[0,2,0]", json)
-        end
+    @testset "trailing window has exactly `window` labels ending on scan_date" begin
+        scan_date = Date(2026, 4, 26)
+        json = _build_chart_json(DataFrame(), scan_date, 14)
+        # 14 calendar days: 4-13 through 4-26
+        @test occursin("\"2026-04-13\"", json)
+        @test occursin("\"2026-04-26\"", json)
+        @test !occursin("\"2026-04-12\"", json)
+        @test !occursin("\"2026-04-27\"", json)
     end
 
-    @testset "all-empty history but on-disk partitions → all zeros" begin
-        mktempdir() do tmpdir
-            _mk_partitions(tmpdir, [Date(2026, 4, 21), Date(2026, 4, 22)])
-            json = _build_chart_json(DataFrame(), tmpdir, 14)
-            @test occursin("\"2026-04-21\"", json)
-            @test occursin("\"2026-04-22\"", json)
-            @test occursin("[0,0]", json)
-        end
+    @testset "all-empty history → all zeros over the window" begin
+        json = _build_chart_json(DataFrame(), Date(2026, 4, 26), 14)
+        @test occursin("\"counts\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0]", json)
     end
 
-    @testset "tail trims to last `window` scan dates" begin
-        mktempdir() do tmpdir
-            dates = [Date(2026, 4, d) for d in 10:25]   # 16 dates
-            _mk_partitions(tmpdir, dates)
-            json = _build_chart_json(DataFrame(), tmpdir, 14)
-            @test !occursin("\"2026-04-10\"", json)
-            @test !occursin("\"2026-04-11\"", json)
-            @test occursin("\"2026-04-12\"", json)
-            @test occursin("\"2026-04-25\"", json)
-        end
+    @testset "days with zero gainers and weekends both render as 0" begin
+        # scan_date = Sun 2026-04-26; weekend within window: 4-25, 4-26, 4-19, 4-18
+        scan_date = Date(2026, 4, 26)
+        history = DataFrame(
+            ticker    = ["AAA", "BBB", "CCC"],
+            scan_date = ["2026-04-23", "2026-04-23", "2026-04-24"],
+        )
+        json = _build_chart_json(history, scan_date, 14)
+        # 4-23 has 2, 4-24 has 1, every other day has 0
+        # window: 4-13 ... 4-26 (14 days)
+        # expected counts in order: 0,0,0,0,0,0,0,0,0,0,2,1,0,0
+        @test occursin("\"counts\":[0,0,0,0,0,0,0,0,0,0,2,1,0,0]", json)
     end
 
-    @testset "missing history_dir returns empty payload" begin
-        mktempdir() do tmpdir
-            json = _build_chart_json(DataFrame(), joinpath(tmpdir, "nope"), 14)
-            @test json == """{"labels":[],"counts":[]}"""
-        end
+    @testset "history rows outside the trailing window are dropped" begin
+        scan_date = Date(2026, 4, 26)
+        history = DataFrame(
+            ticker    = ["OLD"],
+            scan_date = ["2026-03-01"],   # well outside the 14-day window
+        )
+        json = _build_chart_json(history, scan_date, 14)
+        @test !occursin("\"2026-03-01\"", json)
+        @test occursin("\"counts\":[0,0,0,0,0,0,0,0,0,0,0,0,0,0]", json)
     end
 
-    @testset "non-partition entries in history_dir are ignored" begin
-        mktempdir() do tmpdir
-            _mk_partitions(tmpdir, [Date(2026, 4, 22)])
-            mkdir(joinpath(tmpdir, "not-a-partition"))
-            touch(joinpath(tmpdir, "stray-file"))
-            json = _build_chart_json(DataFrame(), tmpdir, 14)
-            @test occursin("\"2026-04-22\"", json)
-            @test !occursin("not-a-partition", json)
-            @test !occursin("stray-file", json)
-        end
+    @testset "counts payload reflects gainer counts on matching days" begin
+        scan_date = Date(2026, 4, 26)
+        history = DataFrame(
+            ticker    = ["A","B","C","D","E","X","Y","Z"],
+            scan_date = ["2026-04-25","2026-04-25","2026-04-25","2026-04-25","2026-04-25",
+                         "2026-04-26","2026-04-26","2026-04-26"],
+        )
+        json = _build_chart_json(history, scan_date, 14)
+        @test occursin("5,3]", json)
+    end
+
+    @testset "smaller window respected" begin
+        scan_date = Date(2026, 4, 26)
+        json = _build_chart_json(DataFrame(), scan_date, 3)
+        @test occursin("\"2026-04-24\"", json)
+        @test occursin("\"2026-04-25\"", json)
+        @test occursin("\"2026-04-26\"", json)
+        @test !occursin("\"2026-04-23\"", json)
+        @test occursin("\"counts\":[0,0,0]", json)
     end
 
 end
