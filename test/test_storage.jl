@@ -1,5 +1,5 @@
 using Test, DataFrames, Dates, Parquet2
-using StockMonitor: write_results, load_history
+using StockMonitor: write_results, load_history, load_prev_rank_map
 
 function sample_results(scan_date=Date(2026, 4, 22))
     DataFrame(
@@ -82,6 +82,100 @@ end
         mktempdir() do tmpdir
             out = load_history(joinpath(tmpdir, "nothing"))
             @test nrow(out) == 0
+        end
+    end
+
+    @testset "load_prev_rank_map" begin
+        @testset "nonexistent history_dir returns empty dict" begin
+            mktempdir() do tmpdir
+                @test load_prev_rank_map(joinpath(tmpdir, "nothing"), Date(2026, 4, 23)) == Dict{String,Int}()
+            end
+        end
+
+        @testset "empty history_dir returns empty dict" begin
+            mktempdir() do tmpdir
+                hdir = joinpath(tmpdir, "history")
+                mkpath(hdir)
+                @test load_prev_rank_map(hdir, Date(2026, 4, 23)) == Dict{String,Int}()
+            end
+        end
+
+        @testset "strict less-than: scan_date equals last partition returns prior" begin
+            mktempdir() do tmpdir
+                rdir = joinpath(tmpdir, "results")
+                hdir = joinpath(tmpdir, "history")
+                lat  = joinpath(rdir, "latest.parquet")
+                d21 = Date(2026, 4, 21)
+                d22 = Date(2026, 4, 22)
+                d23 = Date(2026, 4, 23)
+                write_results(sample_results(d21), d21, rdir, hdir, lat)
+                write_results(sample_results(d22), d22, rdir, hdir, lat)
+                write_results(sample_results(d23), d23, rdir, hdir, lat)
+
+                m = load_prev_rank_map(hdir, Date(2026, 4, 23))
+                @test m == Dict("AAA" => 1, "BBB" => 2)
+            end
+        end
+
+        @testset "scan_date=2026-04-22 returns map from 2026-04-21" begin
+            mktempdir() do tmpdir
+                rdir = joinpath(tmpdir, "results")
+                hdir = joinpath(tmpdir, "history")
+                lat  = joinpath(rdir, "latest.parquet")
+                d21 = Date(2026, 4, 21)
+                d22 = Date(2026, 4, 22)
+                d23 = Date(2026, 4, 23)
+                write_results(sample_results(d21), d21, rdir, hdir, lat)
+                write_results(sample_results(d22), d22, rdir, hdir, lat)
+                write_results(sample_results(d23), d23, rdir, hdir, lat)
+
+                m = load_prev_rank_map(hdir, Date(2026, 4, 22))
+                @test m == Dict("AAA" => 1, "BBB" => 2)
+            end
+        end
+
+        @testset "scan_date=2026-04-21 with no prior partition returns empty dict" begin
+            mktempdir() do tmpdir
+                rdir = joinpath(tmpdir, "results")
+                hdir = joinpath(tmpdir, "history")
+                lat  = joinpath(rdir, "latest.parquet")
+                d21 = Date(2026, 4, 21)
+                d22 = Date(2026, 4, 22)
+                d23 = Date(2026, 4, 23)
+                write_results(sample_results(d21), d21, rdir, hdir, lat)
+                write_results(sample_results(d22), d22, rdir, hdir, lat)
+                write_results(sample_results(d23), d23, rdir, hdir, lat)
+
+                @test load_prev_rank_map(hdir, Date(2026, 4, 21)) == Dict{String,Int}()
+            end
+        end
+
+        @testset "prior partition with zero rows returns empty dict" begin
+            mktempdir() do tmpdir
+                hdir = joinpath(tmpdir, "history")
+                part = joinpath(hdir, "date=2026-04-21")
+                mkpath(part)
+                empty_df = DataFrame(rank=Int[], ticker=String[])
+                Parquet2.writefile(joinpath(part, "results.parquet"), empty_df)
+
+                @test load_prev_rank_map(hdir, Date(2026, 4, 23)) == Dict{String,Int}()
+            end
+        end
+
+        @testset "rank values match the parquet data" begin
+            mktempdir() do tmpdir
+                rdir = joinpath(tmpdir, "results")
+                hdir = joinpath(tmpdir, "history")
+                lat  = joinpath(rdir, "latest.parquet")
+                d21 = Date(2026, 4, 21)
+                d22 = Date(2026, 4, 22)
+                write_results(sample_results(d21), d21, rdir, hdir, lat)
+                write_results(sample_results(d22), d22, rdir, hdir, lat)
+
+                m = load_prev_rank_map(hdir, Date(2026, 4, 22))
+                @test m["AAA"] == 1
+                @test m["BBB"] == 2
+            end
         end
     end
 end

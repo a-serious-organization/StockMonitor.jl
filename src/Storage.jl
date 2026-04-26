@@ -39,6 +39,29 @@ function write_results(
 end
 
 
+function load_prev_rank_map(history_dir::AbstractString, scan_date::Date)::Dict{String,Int}
+    isdir(history_dir) || return Dict{String,Int}()
+
+    candidates = [
+        Date(d[6:end])
+        for d in readdir(history_dir)
+        if startswith(d, "date=") && tryparse(Date, d[6:end]) !== nothing
+    ]
+    filter!(d -> d < scan_date, candidates)
+    isempty(candidates) && return Dict{String,Int}()
+
+    prev = maximum(candidates)
+    p = joinpath(history_dir, "date=$(Dates.format(prev, "yyyy-mm-dd"))", "results.parquet")
+    isfile(p) || return Dict{String,Int}()
+
+    df = DataFrame(Parquet2.Dataset(p); copycols=false)
+    ("rank" in names(df) && "ticker" in names(df)) || return Dict{String,Int}()
+    nrow(df) == 0 && return Dict{String,Int}()
+
+    return Dict(string(row.ticker) => Int(row.rank) for row in eachrow(df))
+end
+
+
 function load_history(history_dir::AbstractString)::DataFrame
     isdir(history_dir) || return DataFrame()
 

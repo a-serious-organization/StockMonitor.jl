@@ -103,8 +103,9 @@ function run_scan(config::Dict;
     window_start = window_end - Day(window_days)
 
     # --- storage paths
-    scfg     = config["storage"]
-    bars_dir = get(scfg, "bars_dir", "data/bars")
+    scfg        = config["storage"]
+    bars_dir    = get(scfg, "bars_dir", "data/bars")
+    history_dir = scfg["history_dir"]
 
     # --- tickers
     tickers = load_universe(config["universe"]; force_refresh=refresh_universe)
@@ -185,6 +186,9 @@ function run_scan(config::Dict;
 
     results = screen(metrics, config["criteria"])
 
+    prev_ranks = load_prev_rank_map(history_dir, window_end)
+    results.prev_rank = Union{Int,Missing}[get(prev_ranks, t, missing) for t in results.ticker]
+
     top10 = first(results, 10)
     if nrow(top10) > 0
         @info "top $(nrow(top10)) gainers:\n$(top10[:, [:rank,:ticker,:close,:pct_change,:volume]])"
@@ -195,7 +199,6 @@ function run_scan(config::Dict;
     dry_run && (@info "--dry-run set; skipping output"; return 0)
 
     # --- 11: write results + render site
-    history_dir = scfg["history_dir"]
     write_results(results, window_end,
                   scfg["results_dir"], history_dir, scfg["latest_parquet"])
 

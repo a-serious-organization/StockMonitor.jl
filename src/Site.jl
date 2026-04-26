@@ -30,7 +30,7 @@ const _PAGE_TEMPLATE = """<!DOCTYPE html>
   table.gainers th {
     position: sticky; top: 0; background: #fafafa; color: #222; font-weight: 600;
   }
-  table.gainers th:nth-child(2), table.gainers td:nth-child(2) { text-align: left; }
+  table.gainers th:nth-child(3), table.gainers td:nth-child(3) { text-align: left; }
   .empty { padding: 2rem; text-align: center; color: #777; border: 1px dashed #ccc; border-radius: 0.5rem; }
   .criteria { font-size: 0.85rem; color: #555; }
   #chart-wrap { position: relative; height: 280px; }
@@ -131,15 +131,17 @@ function _format_results_block(df::DataFrame)::String
 
     io = IOBuffer()
     println(io, """<table class="gainers"><thead><tr>""")
-    for col in ["rank","ticker","close","prev_close","pct_change","2d%","5d%","1m%","relvol5d","volume","notional_volume"]
+    for col in ["rank","prev rank","ticker","close","prev_close","pct_change","2d%","5d%","1m%","relvol5d","volume","notional_volume"]
         print(io, "<th>$col</th>")
     end
     println(io, "</tr></thead><tbody>")
     fmt_pct(v) = isnan(v) ? "—" : "$(round(v, digits=2))%"
     fmt_ratio(v) = isnan(v) ? "—" : "$(round(v, digits=2))×"
+    fmt_rank(v) = ismissing(v) ? "—" : string(Int(v))
     for row in eachrow(df)
         println(io, "<tr>",
             "<td>$(row.rank)</td>",
+            "<td>$(fmt_rank(row.prev_rank))</td>",
             "<td>$(row.ticker)</td>",
             "<td>$(round(row.close, digits=2))</td>",
             "<td>$(round(row.prev_close, digits=2))</td>",

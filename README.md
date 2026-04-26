@@ -87,7 +87,7 @@ is safe to delete — a fresh scan will rebuild the trailing window on
 first run (one HTTP request per ticker over the full window, so the cold
 fetch is heavier than subsequent warm runs).
 
-Columns: `rank, ticker, date, close, prev_close, pct_change, pct_change_2d, pct_change_5d, pct_change_1m, volume_ratio_5d, volume, notional_volume`.
+Columns: `rank, prev_rank, ticker, date, close, prev_close, pct_change, pct_change_2d, pct_change_5d, pct_change_1m, volume_ratio_5d, volume, notional_volume`.
 
 ## Dashboard
 
