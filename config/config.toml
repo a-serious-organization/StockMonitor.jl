@@ -14,12 +14,14 @@ cache_max_age_days = 30
 max_workers = 4
 retry_count = 2
 request_timeout = 30       # seconds
+window_days = 40
 
 [storage]
 results_dir = "data/results"
 history_dir = "data/history"
 latest_parquet = "data/results/latest.parquet"
 site_dir = "data/site"
+bars_dir = "data/bars"
 
 [logging]
 level = "Info"

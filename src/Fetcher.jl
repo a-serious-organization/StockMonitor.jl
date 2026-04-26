@@ -63,17 +63,16 @@ end
 function fetch_daily_bars(
         tickers::AbstractVector{<:AbstractString},
         cfg::Dict;
-        period_days::Int = 40,
+        start_date::Date,
+        end_date::Date,
     )::DataFrame
 
     max_workers = get(cfg, "max_workers", 4)
     retry_count = get(cfg, "retry_count", 2)
     timeout_sec = get(cfg, "request_timeout", 30)
 
-    t_end   = now(UTC)
-    t_start = t_end - Day(period_days)
-    p1 = string(round(Int, datetime2unix(t_start)))
-    p2 = string(round(Int, datetime2unix(t_end)))
+    p1 = string(round(Int, datetime2unix(DateTime(start_date))))
+    p2 = string(round(Int, datetime2unix(DateTime(end_date) + Day(1))))
 
     cookies = _get_yf_cookies()
 
