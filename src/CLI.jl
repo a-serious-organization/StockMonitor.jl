@@ -186,7 +186,13 @@ function run_scan(config::Dict;
 
     results = screen(metrics, config["criteria"])
 
-    prev_ranks = load_prev_rank_map(history_dir, window_end; bars_dir=bars_dir)
+    prev_ranks = Dict{String,Int}()
+    trading_dates = sort(existing_bar_dates(bars_dir); rev=true)
+    et_idx = findfirst(d -> d <= window_end, trading_dates)
+    if !isnothing(et_idx) && et_idx + 1 <= length(trading_dates)
+        yesterday = trading_dates[et_idx + 1]
+        prev_ranks = compute_prev_rank_map(bars, config["criteria"], yesterday)
+    end
     results.prev_rank = Union{Int,Missing}[get(prev_ranks, t, missing) for t in results.ticker]
 
     top10 = first(results, 10)

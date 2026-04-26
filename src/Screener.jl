@@ -56,3 +56,22 @@ function screen(df::DataFrame, criteria::Dict)::DataFrame
     @info "screener: $before → $(nrow(result)) rows after filters"
     return result
 end
+
+
+function compute_prev_rank_map(
+        bars::DataFrame,
+        criteria::Dict,
+        yesterday::Date,
+    )::Dict{String,Int}
+
+    bars_y = filter(row -> row.date <= yesterday, bars)
+    isempty(bars_y) && return Dict{String,Int}()
+
+    metrics_y = compute_daily_metrics(bars_y)
+    isempty(metrics_y) && return Dict{String,Int}()
+
+    results_y = screen(metrics_y, criteria)
+    isempty(results_y) && return Dict{String,Int}()
+
+    return Dict(string(row.ticker) => Int(row.rank) for row in eachrow(results_y))
+end
