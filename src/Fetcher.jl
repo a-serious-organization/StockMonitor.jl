@@ -7,7 +7,8 @@ fetch_daily_bars(tickers, cfg)  — HTTP I/O via Yahoo Finance v8 chart API.
 
 const _METRIC_COLS = [:ticker, :date, :close, :prev_close,
                       :pct_change, :volume, :notional_volume,
-                      :pct_change_2d, :pct_change_5d, :pct_change_1m]
+                      :pct_change_2d, :pct_change_5d, :pct_change_1m,
+                      :volume_ratio_5d]
 
 _pct_gain(to::Float64, from::Float64) =
     (isnan(from) || from == 0.0) ? NaN : (to - from) / from * 100.0
@@ -17,6 +18,7 @@ function compute_daily_metrics(bars::DataFrame)::DataFrame
         ticker=String[], date=Date[], close=Float64[], prev_close=Float64[],
         pct_change=Float64[], volume=Int[], notional_volume=Float64[],
         pct_change_2d=Float64[], pct_change_5d=Float64[], pct_change_1m=Float64[],
+        volume_ratio_5d=Float64[],
     )
     isempty(bars) && return empty_out
 
@@ -41,6 +43,13 @@ function compute_daily_metrics(bars::DataFrame)::DataFrame
         pct_change_5d = _pct_gain(close, n >= 6  ? gdf[end-5,  :close] : NaN)
         pct_change_1m = _pct_gain(close, n >= 22 ? gdf[end-21, :close] : NaN)
 
+        volume_ratio_5d = if n >= 6
+            avg5 = sum(gdf[end-5:end-1, :volume]) / 5
+            avg5 == 0 ? NaN : last_row.volume / avg5
+        else
+            NaN
+        end
+
         push!(result_rows, (
             ticker          = last_row.ticker,
             date            = last_row.date,
@@ -52,6 +61,7 @@ function compute_daily_metrics(bars::DataFrame)::DataFrame
             pct_change_2d   = pct_change_2d,
             pct_change_5d   = pct_change_5d,
             pct_change_1m   = pct_change_1m,
+            volume_ratio_5d = volume_ratio_5d,
         ))
     end
 

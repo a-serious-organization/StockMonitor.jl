@@ -4,6 +4,8 @@ min_price = 2.00           # US dollars
 min_volume = 100_000       # shares
 min_notional_volume = 1_000_000  # dollars (close * volume)
 direction = "gainers"      # gainers | losers | both
+# min_pct_change_2d = 7.0          # 2-day pct gain (direction-aware)
+# min_volume_ratio_5d = 2.0        # today's volume ÷ avg of prior 5 trading days
 
 [universe]
 source = "russell_3000"

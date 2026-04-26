@@ -83,7 +83,7 @@ is safe to delete — a fresh scan will rebuild the trailing window on
 first run (one HTTP request per ticker over the full window, so the cold
 fetch is heavier than subsequent warm runs).
 
-Columns: `rank, ticker, date, close, prev_close, pct_change, pct_change_2d, pct_change_5d, pct_change_1m, volume, notional_volume`.
+Columns: `rank, ticker, date, close, prev_close, pct_change, pct_change_2d, pct_change_5d, pct_change_1m, volume_ratio_5d, volume, notional_volume`.
 
 ## Dashboard
 
@@ -119,6 +119,8 @@ min_price = 2.00           # USD
 min_volume = 100_000       # shares
 min_notional_volume = 1_000_000  # USD
 direction = "gainers"      # gainers | losers | both
+# min_pct_change_2d = 7.0          # 2-day pct gain (direction-aware)
+# min_volume_ratio_5d = 2.0        # today's volume ÷ avg of prior 5 trading days
 ```
 
 Full config: see `config/config.toml`.

@@ -9,16 +9,19 @@ const DEFAULT_CRITERIA = Dict(
     "direction"            => "gainers",
 )
 
-function make_row(; ticker, close, prev_close, volume, pct_change=nothing)
+function make_row(; ticker, close, prev_close, volume, pct_change=nothing,
+                    pct_change_2d=NaN, volume_ratio_5d=NaN)
     pc = isnothing(pct_change) ? (close - prev_close) / prev_close * 100 : pct_change
     DataFrame(
-        ticker         = [ticker],
-        date           = [Dates.today()],
-        close          = [close],
-        prev_close     = [prev_close],
-        pct_change     = [pc],
-        volume         = [volume],
-        notional_volume= [close * volume],
+        ticker          = [ticker],
+        date            = [Dates.today()],
+        close           = [close],
+        prev_close      = [prev_close],
+        pct_change      = [pc],
+        volume          = [volume],
+        notional_volume = [close * volume],
+        pct_change_2d   = [Float64(pct_change_2d)],
+        volume_ratio_5d = [Float64(volume_ratio_5d)],
     )
 end
 
@@ -97,6 +100,97 @@ end
         )
         out = screen(df, DEFAULT_CRITERIA)
         @test out.ticker == ["UP"]
+    end
+
+    # ── min_pct_change_2d ────────────────────────────────────────────────────
+
+    @testset "min_pct_change_2d gainers keeps rows >= threshold" begin
+        df = vcat(
+            make_row(ticker="BIG2",  close=10.0, prev_close=9.0, volume=200_000, pct_change_2d=8.0),
+            make_row(ticker="SMALL2",close=10.0, prev_close=9.0, volume=200_000, pct_change_2d=3.0),
+        )
+        crit = merge(DEFAULT_CRITERIA, Dict("min_pct_change_2d" => 5.0))
+        out = screen(df, crit)
+        @test out.ticker == ["BIG2"]
+    end
+
+    @testset "min_pct_change_2d losers keeps rows <= -threshold" begin
+        df = vcat(
+            make_row(ticker="DROP",  close=10.0, prev_close=12.0, volume=200_000,
+                     pct_change=-20.0, pct_change_2d=-8.0),
+            make_row(ticker="NUDGE", close=10.0, prev_close=12.0, volume=200_000,
+                     pct_change=-20.0, pct_change_2d=-2.0),
+        )
+        crit = merge(DEFAULT_CRITERIA, Dict("direction" => "losers", "min_pct_change_2d" => 5.0))
+        out = screen(df, crit)
+        @test out.ticker == ["DROP"]
+    end
+
+    @testset "min_pct_change_2d both keeps rows with |2d| >= threshold" begin
+        df = vcat(
+            make_row(ticker="UPON",  close=10.0, prev_close=9.0,  volume=200_000, pct_change_2d= 7.0),
+            make_row(ticker="DDOWN", close=10.0, prev_close=12.0, volume=200_000,
+                     pct_change=-20.0, pct_change_2d=-7.0),
+            make_row(ticker="FLAT2", close=10.0, prev_close=9.0,  volume=200_000, pct_change_2d= 1.0),
+        )
+        crit = merge(DEFAULT_CRITERIA, Dict("direction" => "both", "min_pct_change_2d" => 5.0))
+        out = screen(df, crit)
+        @test sort(out.ticker) == ["DDOWN", "UPON"]
+    end
+
+    @testset "min_pct_change_2d NaN rows excluded when threshold set" begin
+        df = vcat(
+            make_row(ticker="GOOD", close=10.0, prev_close=9.0, volume=200_000, pct_change_2d=8.0),
+            make_row(ticker="NAN",  close=10.0, prev_close=9.0, volume=200_000),   # pct_change_2d=NaN
+        )
+        crit = merge(DEFAULT_CRITERIA, Dict("min_pct_change_2d" => 5.0))
+        out = screen(df, crit)
+        @test out.ticker == ["GOOD"]
+    end
+
+    @testset "min_pct_change_2d NaN rows kept when threshold absent" begin
+        df = make_row(ticker="NAN", close=10.0, prev_close=9.0, volume=200_000)  # pct_change_2d=NaN
+        out = screen(df, DEFAULT_CRITERIA)
+        @test nrow(out) == 1
+    end
+
+    # ── min_volume_ratio_5d ──────────────────────────────────────────────────
+
+    @testset "min_volume_ratio_5d keeps rows >= threshold" begin
+        df = vcat(
+            make_row(ticker="SPIKE", close=10.0, prev_close=9.0, volume=200_000, volume_ratio_5d=3.0),
+            make_row(ticker="NORM",  close=10.0, prev_close=9.0, volume=200_000, volume_ratio_5d=0.9),
+        )
+        crit = merge(DEFAULT_CRITERIA, Dict("min_volume_ratio_5d" => 2.0))
+        out = screen(df, crit)
+        @test out.ticker == ["SPIKE"]
+    end
+
+    @testset "min_volume_ratio_5d NaN rows excluded when threshold set" begin
+        df = vcat(
+            make_row(ticker="GOOD", close=10.0, prev_close=9.0, volume=200_000, volume_ratio_5d=3.0),
+            make_row(ticker="NAN",  close=10.0, prev_close=9.0, volume=200_000),   # volume_ratio_5d=NaN
+        )
+        crit = merge(DEFAULT_CRITERIA, Dict("min_volume_ratio_5d" => 2.0))
+        out = screen(df, crit)
+        @test out.ticker == ["GOOD"]
+    end
+
+    @testset "min_volume_ratio_5d NaN rows kept when threshold absent" begin
+        df = make_row(ticker="NAN", close=10.0, prev_close=9.0, volume=200_000)  # volume_ratio_5d=NaN
+        out = screen(df, DEFAULT_CRITERIA)
+        @test nrow(out) == 1
+    end
+
+    # ── missing criteria keys → no filtering (regression) ───────────────────
+
+    @testset "missing both new keys does not filter any row" begin
+        df = vcat(
+            make_row(ticker="A", close=10.0, prev_close=9.0, volume=200_000, pct_change_2d=1.0, volume_ratio_5d=0.5),
+            make_row(ticker="B", close=10.0, prev_close=9.0, volume=200_000),  # both NaN
+        )
+        out = screen(df, DEFAULT_CRITERIA)   # no new keys in criteria
+        @test nrow(out) == 2
     end
 
 end
