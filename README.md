@@ -50,6 +50,9 @@ julia --project scripts/scan.jl --force
 
 # Force re-download for a specific date or range
 julia --project scripts/scan.jl -d 20260424 --force
+
+# Skip Yahoo entirely; recompute and re-render the dashboard from cache
+julia --project scripts/scan.jl --no-fetch
 ```
 
 ### CLI flags
@@ -62,6 +65,7 @@ julia --project scripts/scan.jl -d 20260424 --force
 | `--limit N` | (all) | Use first N tickers only |
 | `-d YYYYMMDD[:YYYYMMDD]` | (none) | Ensure date(s) are cached. Missing-only by default; combine with `--force` to overwrite. Repeatable; union is taken |
 | `--force` | false | Re-download all in-scope dates, overwriting existing partitions |
+| `--no-fetch` | false | Skip Yahoo fetch entirely; recompute and re-render from the existing bars cache |
 
 Exit codes: `0` success, `1` fatal error.
 

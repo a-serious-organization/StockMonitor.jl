@@ -89,6 +89,7 @@ const _PAGE_TEMPLATE = """<!DOCTYPE html>
 function render_site(
         results::DataFrame,
         history::DataFrame,
+        history_dir::AbstractString,
         config::Dict,
         scan_date::Date,
         site_dir::AbstractString,
@@ -97,7 +98,7 @@ function render_site(
     mkpath(site_dir)
 
     results_block   = _format_results_block(results)
-    chart_data_json = _build_chart_json(history, _HISTORY_WINDOW)
+    chart_data_json = _build_chart_json(history, history_dir, _HISTORY_WINDOW)
     criteria_str    = _format_criteria(get(config, "criteria", Dict()))
 
     page = _PAGE_TEMPLATE
@@ -148,15 +149,31 @@ end
 format_int(n) = replace(string(Int(n)), r"(?<=\d)(?=(\d{3})+$)" => ",")
 
 
-function _build_chart_json(history::DataFrame, window::Int)::String
-    if isempty(history) || !("scan_date" in names(history))
-        return """{"labels":[],"counts":[]}"""
+function _build_chart_json(history::DataFrame, history_dir::AbstractString, window::Int)::String
+    # Enumerate scan-day partitions on disk: a day with 0 gainers has 0 rows
+    # in `history` and would silently disappear from a groupby aggregation.
+    scan_dates = String[]
+    if isdir(history_dir)
+        for entry in readdir(history_dir)
+            startswith(entry, "date=") || continue
+            isdir(joinpath(history_dir, entry)) || continue
+            push!(scan_dates, entry[6:end])
+        end
+        sort!(scan_dates)
     end
-    counts = combine(groupby(history, :scan_date), nrow => :n)
-    sort!(counts, :scan_date)
-    tail = last(counts, window)
-    labels = ["\"$(row.scan_date)\"" for row in eachrow(tail)]
-    values = [string(row.n) for row in eachrow(tail)]
+    isempty(scan_dates) && return """{"labels":[],"counts":[]}"""
+
+    counts_map = Dict{String,Int}()
+    if !isempty(history) && "scan_date" in names(history)
+        agg = combine(groupby(history, :scan_date), nrow => :n)
+        for row in eachrow(agg)
+            counts_map[string(row.scan_date)] = row.n
+        end
+    end
+
+    tail   = last(scan_dates, window)
+    labels = ["\"$d\"" for d in tail]
+    values = [string(get(counts_map, d, 0)) for d in tail]
     return """{"labels":[$(join(labels,","))],"counts":[$(join(values,","))]}"""
 end
 

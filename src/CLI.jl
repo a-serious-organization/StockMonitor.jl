@@ -31,6 +31,9 @@ function _parse_args(args)
         "--force"
             action  = :store_true
             help    = "Re-download all in-scope dates, overwriting existing partitions"
+        "--no-fetch"
+            action  = :store_true
+            help    = "Skip Yahoo fetch entirely; recompute and re-render from the existing bars cache"
     end
     return parse_args(args, s)
 end
@@ -91,7 +94,8 @@ function run_scan(config::Dict;
                   dry_run::Bool=false,
                   limit::Union{Int,Nothing}=nothing,
                   requested_dates::Vector{Date}=Date[],
-                  force::Bool=false)::Int
+                  force::Bool=false,
+                  no_fetch::Bool=false)::Int
 
     # --- 1-2: window bounds
     window_days  = get(get(config, "data", Dict()), "window_days", 40)
@@ -113,7 +117,13 @@ function run_scan(config::Dict;
     existing      = existing_bar_dates(bars_dir)
     window_dates  = collect(window_start:Day(1):window_end)
 
-    if force
+    dates_to_fetch = Date[]
+    overwrite_set  = Set{Date}()
+    fetched        = DataFrame()
+
+    if no_fetch
+        @info "--no-fetch: skipping Yahoo fetch; using existing bars cache"
+    elseif force
         # --force: re-fetch the trailing window plus any --dates entries, overwriting all.
         dates_to_fetch = sort(unique(vcat(window_dates, requested_dates)))
         overwrite_set  = Set(dates_to_fetch)
@@ -152,7 +162,7 @@ function run_scan(config::Dict;
             isempty(incremental) || write_bars_partitions(incremental, bars_dir; overwrite=false)
             isempty(forced)      || write_bars_partitions(forced,      bars_dir; overwrite=true)
         end
-    else
+    elseif !no_fetch
         @info "all in-scope dates cached; skipping fetch"
     end
 
@@ -189,7 +199,7 @@ function run_scan(config::Dict;
     write_results(results, window_end,
                   scfg["results_dir"], history_dir, scfg["latest_parquet"])
 
-    render_site(results, load_history(history_dir),
+    render_site(results, load_history(history_dir), history_dir,
                 config, window_end, get(scfg, "site_dir", "data/site"))
 
     return 0
@@ -230,6 +240,7 @@ function main(args=ARGS)
             limit            = parsed["limit"],
             requested_dates  = requested_dates,
             force            = parsed["force"],
+            no_fetch         = parsed["no-fetch"],
         )
     catch e
         @error "scan failed" exception=(e, catch_backtrace())
