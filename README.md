@@ -35,6 +35,21 @@ julia --project scripts/scan.jl --limit 20 --dry-run
 
 # Force re-fetch of the Russell 3000 universe (bypass 30-day cache)
 julia --project scripts/scan.jl --refresh-universe
+
+# Backfill a specific date if it's missing from the cache
+julia --project scripts/scan.jl -d 20260424
+
+# Backfill a date range (only missing dates are fetched)
+julia --project scripts/scan.jl -d 20260420:20260424
+
+# -d is repeatable; the union of dates is backfilled
+julia --project scripts/scan.jl -d 20260415 -d 20260420:20260424
+
+# Force re-download (overwrite existing partitions) for the trailing window
+julia --project scripts/scan.jl --force
+
+# Force re-download for a specific date or range
+julia --project scripts/scan.jl -d 20260424 --force
 ```
 
 ### CLI flags
@@ -45,6 +60,8 @@ julia --project scripts/scan.jl --refresh-universe
 | `--refresh-universe` | false | Force IWV re-fetch |
 | `--dry-run` | false | Compute but write nothing |
 | `--limit N` | (all) | Use first N tickers only |
+| `-d YYYYMMDD[:YYYYMMDD]` | (none) | Ensure date(s) are cached. Missing-only by default; combine with `--force` to overwrite. Repeatable; union is taken |
+| `--force` | false | Re-download all in-scope dates, overwriting existing partitions |
 
 Exit codes: `0` success, `1` fatal error.
 
@@ -55,7 +72,14 @@ Every scan writes:
 - `data/results/gainers_YYYY-MM-DD.parquet` — dated snapshot
 - `data/results/latest.parquet` — overwritten each run
 - `data/history/date=YYYY-MM-DD/results.parquet` — partitioned history
+- `data/bars/date=YYYY-MM-DD/bars.parquet` — OHLCV bars cache (one file per trading day)
 - `data/site/index.html` — HTML dashboard (see below)
+
+Scans are **incremental by default**: only missing dates in the trailing
+40-day window are fetched from Yahoo Finance. Today's partition is always
+re-fetched because intraday data may be partial. The `data/bars/` cache
+accumulates indefinitely and is safe to delete — a fresh scan will rebuild
+the trailing window on first run.
 
 Columns: `rank, ticker, date, close, prev_close, pct_change, pct_change_2d, pct_change_5d, pct_change_1m, volume, notional_volume`.
 
