@@ -92,7 +92,8 @@ end
         @test nrow(out) == 0
         for col in [:ticker, :date, :close, :prev_close,
                     :pct_change, :volume, :notional_volume,
-                    :pct_change_2d, :pct_change_5d, :pct_change_1m]
+                    :pct_change_2d, :pct_change_5d, :pct_change_1m,
+                    :volume_ratio_5d]
             @test col in Symbol.(names(out))
         end
     end
@@ -135,5 +136,40 @@ end
         @test isnan(out[1, :pct_change_2d])
         @test isnan(out[1, :pct_change_5d])
         @test isnan(out[1, :pct_change_1m])
+    end
+
+    @testset "volume_ratio_5d ≈ 1.0 when today equals prior-5 average" begin
+        dates_6 = [Date(2026, 4, 1) + Day(i) for i in 0:5]
+        rows_6  = [("AAA", dates_6[i], 100.0, 1_000_000) for i in 1:6]
+        bars    = make_bars(rows_6)
+        out     = compute_daily_metrics(bars)
+        @test nrow(out) == 1
+        @test out[1, :volume_ratio_5d] ≈ 1.0
+    end
+
+    @testset "volume_ratio_5d ≈ 2.0 when today is 2× prior-5 average" begin
+        dates_6 = [Date(2026, 4, 1) + Day(i) for i in 0:5]
+        rows_6  = [("AAA", dates_6[i], 100.0, i == 6 ? 2_000_000 : 1_000_000) for i in 1:6]
+        bars    = make_bars(rows_6)
+        out     = compute_daily_metrics(bars)
+        @test nrow(out) == 1
+        @test out[1, :volume_ratio_5d] ≈ 2.0
+    end
+
+    @testset "volume_ratio_5d is NaN with fewer than 6 sessions" begin
+        bars = make_bars([("AAA", d1, 100.0, 1_000_000),
+                          ("AAA", d2, 110.0, 2_000_000)])
+        out = compute_daily_metrics(bars)
+        @test nrow(out) == 1
+        @test isnan(out[1, :volume_ratio_5d])
+    end
+
+    @testset "volume_ratio_5d is NaN when prior-5 volume sum is 0" begin
+        dates_6 = [Date(2026, 4, 1) + Day(i) for i in 0:5]
+        rows_6  = [("AAA", dates_6[i], 100.0, i == 6 ? 1_000_000 : 0) for i in 1:6]
+        bars    = make_bars(rows_6)
+        out     = compute_daily_metrics(bars)
+        @test nrow(out) == 1
+        @test isnan(out[1, :volume_ratio_5d])
     end
 end

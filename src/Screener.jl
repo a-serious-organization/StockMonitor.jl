@@ -27,6 +27,24 @@ function screen(df::DataFrame, criteria::Dict)::DataFrame
            (df.volume         .>= min_vol) .&
            (df.notional_volume .>= min_notional)
 
+    if haskey(criteria, "min_pct_change_2d")
+        th   = Float64(criteria["min_pct_change_2d"])
+        safe = .!isnan.(df.pct_change_2d)
+        if direction == "gainers"
+            mask = mask .& safe .& (df.pct_change_2d .>= th)
+        elseif direction == "losers"
+            mask = mask .& safe .& (df.pct_change_2d .<= -th)
+        elseif direction == "both"
+            mask = mask .& safe .& (abs.(df.pct_change_2d) .>= th)
+        end
+    end
+
+    if haskey(criteria, "min_volume_ratio_5d")
+        th   = Float64(criteria["min_volume_ratio_5d"])
+        safe = .!isnan.(df.volume_ratio_5d)
+        mask = mask .& safe .& (df.volume_ratio_5d .>= th)
+    end
+
     before = nrow(df)
     filtered = df[mask, :]
 
