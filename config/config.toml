@@ -14,7 +14,7 @@ cache_max_age_days = 30
 max_workers = 4
 retry_count = 2
 request_timeout = 30       # seconds
-window_days = 40
+window_days = 365
 
 [storage]
 results_dir = "data/results"

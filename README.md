@@ -76,10 +76,12 @@ Every scan writes:
 - `data/site/index.html` — HTML dashboard (see below)
 
 Scans are **incremental by default**: only missing dates in the trailing
-40-day window are fetched from Yahoo Finance. Today's partition is always
-re-fetched because intraday data may be partial. The `data/bars/` cache
-accumulates indefinitely and is safe to delete — a fresh scan will rebuild
-the trailing window on first run.
+window (365 days, configurable via `[data].window_days`) are fetched from
+Yahoo Finance. Today's partition is always re-fetched because intraday
+data may be partial. The `data/bars/` cache accumulates indefinitely and
+is safe to delete — a fresh scan will rebuild the trailing window on
+first run (one HTTP request per ticker over the full window, so the cold
+fetch is heavier than subsequent warm runs).
 
 Columns: `rank, ticker, date, close, prev_close, pct_change, pct_change_2d, pct_change_5d, pct_change_1m, volume, notional_volume`.
 
