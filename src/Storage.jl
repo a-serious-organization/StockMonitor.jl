@@ -39,7 +39,11 @@ function write_results(
 end
 
 
-function load_prev_rank_map(history_dir::AbstractString, scan_date::Date)::Dict{String,Int}
+function load_prev_rank_map(
+        history_dir::AbstractString,
+        scan_date::Date;
+        bars_dir::Union{AbstractString,Nothing}=nothing,
+    )::Dict{String,Int}
     isdir(history_dir) || return Dict{String,Int}()
 
     candidates = [
@@ -48,6 +52,27 @@ function load_prev_rank_map(history_dir::AbstractString, scan_date::Date)::Dict{
         if startswith(d, "date=") && tryparse(Date, d[6:end]) !== nothing
     ]
     filter!(d -> d < scan_date, candidates)
+    isempty(candidates) && return Dict{String,Int}()
+
+    # Yahoo only emits bars for trading days, so the bars cache doubles as a
+    # trading-day oracle. Without it, "yesterday" can land on a weekend or
+    # holiday, where the scan reused Friday's data and prev_rank == rank.
+    if !isnothing(bars_dir) && isdir(bars_dir)
+        trading = Set(existing_bar_dates(bars_dir))
+        if !isempty(trading)
+            effective_today = nothing
+            for d in sort(collect(trading); rev=true)
+                if d <= scan_date
+                    effective_today = d
+                    break
+                end
+            end
+            if !isnothing(effective_today)
+                filter!(d -> d < effective_today && d in trading, candidates)
+            end
+        end
+    end
+
     isempty(candidates) && return Dict{String,Int}()
 
     prev = maximum(candidates)

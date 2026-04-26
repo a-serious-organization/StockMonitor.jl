@@ -186,7 +186,7 @@ function run_scan(config::Dict;
 
     results = screen(metrics, config["criteria"])
 
-    prev_ranks = load_prev_rank_map(history_dir, window_end)
+    prev_ranks = load_prev_rank_map(history_dir, window_end; bars_dir=bars_dir)
     results.prev_rank = Union{Int,Missing}[get(prev_ranks, t, missing) for t in results.ticker]
 
     top10 = first(results, 10)

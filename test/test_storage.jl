@@ -177,5 +177,85 @@ end
                 @test m["BBB"] == 2
             end
         end
+
+        @testset "bars_dir filter: weekend prev partition is skipped" begin
+            mktempdir() do tmpdir
+                hdir = joinpath(tmpdir, "history")
+                bdir = joinpath(tmpdir, "bars")
+                # Thu 4-23, Fri 4-24, Sat 4-25, Sun 4-26 — each tagged with a distinct ticker
+                for (d, top) in [(Date(2026, 4, 23), "THU"), (Date(2026, 4, 24), "FRI"),
+                                 (Date(2026, 4, 25), "SAT"), (Date(2026, 4, 26), "SUN")]
+                    part = joinpath(hdir, "date=$(Dates.format(d, "yyyy-mm-dd"))")
+                    mkpath(part)
+                    Parquet2.writefile(joinpath(part, "results.parquet"),
+                                       DataFrame(rank=[1], ticker=[top]))
+                end
+                # Bars only on trading days (Thu, Fri)
+                mkpath(joinpath(bdir, "date=2026-04-23"))
+                mkpath(joinpath(bdir, "date=2026-04-24"))
+
+                # No bars_dir → calendar logic → prev = Sat
+                @test load_prev_rank_map(hdir, Date(2026, 4, 26)) == Dict("SAT" => 1)
+
+                # With bars_dir → effective_today = Fri, prev trading day = Thu
+                @test load_prev_rank_map(hdir, Date(2026, 4, 26); bars_dir=bdir) == Dict("THU" => 1)
+            end
+        end
+
+        @testset "bars_dir filter: today is trading day, prev jumps over weekend" begin
+            mktempdir() do tmpdir
+                hdir = joinpath(tmpdir, "history")
+                bdir = joinpath(tmpdir, "bars")
+                for (d, top) in [(Date(2026, 4, 23), "THU"), (Date(2026, 4, 24), "FRI"),
+                                 (Date(2026, 4, 27), "MON")]
+                    part = joinpath(hdir, "date=$(Dates.format(d, "yyyy-mm-dd"))")
+                    mkpath(part)
+                    Parquet2.writefile(joinpath(part, "results.parquet"),
+                                       DataFrame(rank=[1], ticker=[top]))
+                end
+                for d in [Date(2026, 4, 23), Date(2026, 4, 24), Date(2026, 4, 27)]
+                    mkpath(joinpath(bdir, "date=$(Dates.format(d, "yyyy-mm-dd"))"))
+                end
+
+                @test load_prev_rank_map(hdir, Date(2026, 4, 27); bars_dir=bdir) == Dict("FRI" => 1)
+            end
+        end
+
+        @testset "bars_dir filter: holiday gap is skipped" begin
+            mktempdir() do tmpdir
+                hdir = joinpath(tmpdir, "history")
+                bdir = joinpath(tmpdir, "bars")
+                # Imagine Mon was a holiday: history partition was still written (scan ran), but
+                # Yahoo returned no bars, so no bars partition for Mon.
+                for (d, top) in [(Date(2026, 4, 23), "THU"), (Date(2026, 4, 24), "FRI"),
+                                 (Date(2026, 4, 27), "MON_HOL"), (Date(2026, 4, 28), "TUE")]
+                    part = joinpath(hdir, "date=$(Dates.format(d, "yyyy-mm-dd"))")
+                    mkpath(part)
+                    Parquet2.writefile(joinpath(part, "results.parquet"),
+                                       DataFrame(rank=[1], ticker=[top]))
+                end
+                for d in [Date(2026, 4, 23), Date(2026, 4, 24), Date(2026, 4, 28)]
+                    mkpath(joinpath(bdir, "date=$(Dates.format(d, "yyyy-mm-dd"))"))
+                end
+
+                @test load_prev_rank_map(hdir, Date(2026, 4, 28); bars_dir=bdir) == Dict("FRI" => 1)
+            end
+        end
+
+        @testset "bars_dir empty: falls back to calendar logic" begin
+            mktempdir() do tmpdir
+                hdir = joinpath(tmpdir, "history")
+                bdir = joinpath(tmpdir, "bars")
+                mkpath(bdir)
+                for (d, top) in [(Date(2026, 4, 24), "FRI"), (Date(2026, 4, 25), "SAT")]
+                    part = joinpath(hdir, "date=$(Dates.format(d, "yyyy-mm-dd"))")
+                    mkpath(part)
+                    Parquet2.writefile(joinpath(part, "results.parquet"),
+                                       DataFrame(rank=[1], ticker=[top]))
+                end
+
+                @test load_prev_rank_map(hdir, Date(2026, 4, 26); bars_dir=bdir) == Dict("SAT" => 1)
+            end
+        end
     end
 end
