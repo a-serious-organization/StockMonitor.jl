@@ -1,5 +1,5 @@
 using Test, DataFrames, Dates
-using StockMonitor: screen
+using StockMonitor: screen, compute_prev_rank_map
 
 const DEFAULT_CRITERIA = Dict(
     "min_pct_change"       => 5.0,
@@ -191,6 +191,91 @@ end
         )
         out = screen(df, DEFAULT_CRITERIA)   # no new keys in criteria
         @test nrow(out) == 2
+    end
+
+end
+
+
+# ── compute_prev_rank_map: re-screen bars filtered to ≤ yesterday ───────────
+
+function _bars_with_jumps()
+    # 4 days of bars for 2 tickers with different daily moves so the screen
+    # ranking changes day-over-day.
+    rows = NamedTuple[]
+    # Day 1 (2026-04-20): baseline
+    # Day 2 (2026-04-21): AAA +20%, BBB +5%
+    # Day 3 (2026-04-22): AAA +5%,  BBB +20%
+    # Day 4 (2026-04-23): AAA +30%, BBB +5%
+    pairs = [
+        (Date(2026, 4, 20), 100.0,  50.0),
+        (Date(2026, 4, 21), 120.0,  52.5),
+        (Date(2026, 4, 22), 126.0,  63.0),
+        (Date(2026, 4, 23), 163.8,  66.15),
+    ]
+    for (d, a_close, b_close) in pairs
+        push!(rows, (ticker="AAA", date=d, open=a_close, high=a_close, low=a_close, close=a_close, volume=300_000))
+        push!(rows, (ticker="BBB", date=d, open=b_close, high=b_close, low=b_close, close=b_close, volume=400_000))
+    end
+    return DataFrame(rows)
+end
+
+const _PREV_CRITERIA = Dict(
+    "min_pct_change"      => 0.0,
+    "min_price"           => 1.0,
+    "min_volume"          => 0,
+    "min_notional_volume" => 0.0,
+    "direction"           => "gainers",
+)
+
+@testset "compute_prev_rank_map" begin
+
+    @testset "yesterday at last bar date returns ranks from that day's screen" begin
+        bars = _bars_with_jumps()
+        m = compute_prev_rank_map(bars, _PREV_CRITERIA, Date(2026, 4, 23))
+        # On day 4: AAA +30% > BBB +5% → AAA rank 1, BBB rank 2
+        @test m == Dict("AAA" => 1, "BBB" => 2)
+    end
+
+    @testset "yesterday earlier in the window picks that day's ranking" begin
+        bars = _bars_with_jumps()
+        # Filter to ≤ day 3: latest move is AAA +5%, BBB +20% → BBB rank 1, AAA rank 2
+        m = compute_prev_rank_map(bars, _PREV_CRITERIA, Date(2026, 4, 22))
+        @test m == Dict("BBB" => 1, "AAA" => 2)
+    end
+
+    @testset "yesterday before any bars returns empty dict" begin
+        bars = _bars_with_jumps()
+        m = compute_prev_rank_map(bars, _PREV_CRITERIA, Date(2026, 4, 1))
+        @test m == Dict{String,Int}()
+    end
+
+    @testset "empty bars input returns empty dict" begin
+        bars = DataFrame(ticker=String[], date=Date[], open=Float64[], high=Float64[],
+                         low=Float64[], close=Float64[], volume=Int[])
+        m = compute_prev_rank_map(bars, _PREV_CRITERIA, Date(2026, 4, 23))
+        @test m == Dict{String,Int}()
+    end
+
+    @testset "ticker added in window appears only in dates ≥ its first bar" begin
+        bars = _bars_with_jumps()
+        # Inject a "CCC" ticker with bars only from day 3 onward, +50% on day 4
+        new_rows = [
+            (ticker="CCC", date=Date(2026, 4, 22), open=10.0, high=10.0, low=10.0, close=10.0, volume=500_000),
+            (ticker="CCC", date=Date(2026, 4, 23), open=15.0, high=15.0, low=15.0, close=15.0, volume=500_000),
+        ]
+        bars = vcat(bars, DataFrame(new_rows))
+
+        # yesterday = day 3: CCC has only 1 session → no metric, excluded.
+        m = compute_prev_rank_map(bars, _PREV_CRITERIA, Date(2026, 4, 22))
+        @test !haskey(m, "CCC")
+        @test haskey(m, "AAA") && haskey(m, "BBB")
+    end
+
+    @testset "criteria filter applied (high min_pct_change drops everything)" begin
+        bars = _bars_with_jumps()
+        crit = merge(_PREV_CRITERIA, Dict("min_pct_change" => 99.0))
+        m = compute_prev_rank_map(bars, crit, Date(2026, 4, 23))
+        @test m == Dict{String,Int}()
     end
 
 end

@@ -14,10 +14,10 @@ const _PAGE_TEMPLATE = """<!DOCTYPE html>
 <title>Stock Monitor — {{scan_date}}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-  :root { color-scheme: light dark; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     margin: 0; padding: 2rem; max-width: 1100px; margin-inline: auto; line-height: 1.4;
+    background: #fff; color: #222;
   }
   header h1 { margin: 0 0 0.25rem; font-size: 1.6rem; }
   header .sub { color: #666; font-size: 0.9rem; }
@@ -28,14 +28,25 @@ const _PAGE_TEMPLATE = """<!DOCTYPE html>
     padding: 0.5rem 0.75rem; text-align: right; border-bottom: 1px solid #eee;
   }
   table.gainers th {
-    position: sticky; top: 0; background: #fafafa; font-weight: 600;
+    position: sticky; top: 0; background: #fafafa; color: #222; font-weight: 600;
   }
-  table.gainers th:nth-child(2), table.gainers td:nth-child(2) { text-align: left; }
+  table.gainers th:nth-child(3), table.gainers td:nth-child(3) { text-align: left; }
   .empty { padding: 2rem; text-align: center; color: #777; border: 1px dashed #ccc; border-radius: 0.5rem; }
   .criteria { font-size: 0.85rem; color: #555; }
   #chart-wrap { position: relative; height: 280px; }
   footer { margin-top: 3rem; font-size: 0.8rem; color: #888; }
   footer a { color: #555; }
+  @media (prefers-color-scheme: dark) {
+    body { background: #161616; color: #e6e6e6; }
+    h2 { border-bottom-color: #444; }
+    table.gainers th, table.gainers td { border-bottom-color: #333; }
+    table.gainers th { background: #2a2a2a; color: #e6e6e6; }
+    header .sub { color: #aaa; }
+    .criteria { color: #bbb; }
+    .empty { color: #aaa; border-color: #555; }
+    footer { color: #aaa; }
+    footer a { color: #bbb; }
+  }
 </style>
 </head>
 <body>
@@ -97,7 +108,7 @@ function render_site(
     mkpath(site_dir)
 
     results_block   = _format_results_block(results)
-    chart_data_json = _build_chart_json(history, _HISTORY_WINDOW)
+    chart_data_json = _build_chart_json(history, scan_date, _HISTORY_WINDOW)
     criteria_str    = _format_criteria(get(config, "criteria", Dict()))
 
     page = _PAGE_TEMPLATE
@@ -120,15 +131,17 @@ function _format_results_block(df::DataFrame)::String
 
     io = IOBuffer()
     println(io, """<table class="gainers"><thead><tr>""")
-    for col in ["rank","ticker","close","prev_close","pct_change","2d%","5d%","1m%","relvol5d","volume","notional_volume"]
+    for col in ["rank","prev rank","ticker","close","prev_close","pct_change","2d%","5d%","1m%","relvol5d","volume","notional_volume"]
         print(io, "<th>$col</th>")
     end
     println(io, "</tr></thead><tbody>")
     fmt_pct(v) = isnan(v) ? "—" : "$(round(v, digits=2))%"
     fmt_ratio(v) = isnan(v) ? "—" : "$(round(v, digits=2))×"
+    fmt_rank(v) = ismissing(v) ? "—" : string(Int(v))
     for row in eachrow(df)
         println(io, "<tr>",
             "<td>$(row.rank)</td>",
+            "<td>$(fmt_rank(row.prev_rank))</td>",
             "<td>$(row.ticker)</td>",
             "<td>$(round(row.close, digits=2))</td>",
             "<td>$(round(row.prev_close, digits=2))</td>",
@@ -148,15 +161,18 @@ end
 format_int(n) = replace(string(Int(n)), r"(?<=\d)(?=(\d{3})+$)" => ",")
 
 
-function _build_chart_json(history::DataFrame, window::Int)::String
-    if isempty(history) || !("scan_date" in names(history))
-        return """{"labels":[],"counts":[]}"""
+function _build_chart_json(history::DataFrame, scan_date::Date, window::Int)::String
+    counts_map = Dict{String,Int}()
+    if !isempty(history) && "scan_date" in names(history)
+        agg = combine(groupby(history, :scan_date), nrow => :n)
+        for row in eachrow(agg)
+            counts_map[string(row.scan_date)] = row.n
+        end
     end
-    counts = combine(groupby(history, :scan_date), nrow => :n)
-    sort!(counts, :scan_date)
-    tail = last(counts, window)
-    labels = ["\"$(row.scan_date)\"" for row in eachrow(tail)]
-    values = [string(row.n) for row in eachrow(tail)]
+
+    label_dates = (scan_date - Day(window - 1)):Day(1):scan_date
+    labels = ["\"$(string(d))\"" for d in label_dates]
+    values = [string(get(counts_map, string(d), 0)) for d in label_dates]
     return """{"labels":[$(join(labels,","))],"counts":[$(join(values,","))]}"""
 end
 
